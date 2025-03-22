@@ -6,9 +6,8 @@ WORKDIR /app
 # Copy requirements.txt
 COPY requirements.txt .
 
-# Upgrade pip and install dependencies
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
+# install dependencies
+RUN pip install -r requirements.txt
 
 # Copy .env file
 COPY .env .
