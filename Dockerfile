@@ -13,6 +13,9 @@ COPY . .
 # Copy the .env file
 COPY .env .env
 
+#copy requirements.txt
+COPY requirements.txt requirements.txt
+
 # Upgrade pip and install dependencies
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
