@@ -8,7 +8,7 @@ class Config:
     MAX_FILE_SIZE = 16 * 1024 * 1024  # 16mb
 
     # database settings
-    SQLALCHEMY_DATABASE_URI = os.getenv('POSTGRES_DB_URI')
+    SQLALCHEMY_DATABASE_URI = os.getenv('POSTGRES_DB_URI', 'sqlite:///default.db')
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
     # Ensuring upload folder exists

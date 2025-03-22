@@ -8,20 +8,23 @@ def parse_pdf(file_path):
         file_path (str): The path to the PDF file to be parsed.
 
     Returns:
-        List[Dict[str, str]]: A list of dictionaries, each containing the title, content,
-        and metadata of the slides in the PDF.
+        List[Dict[str, str]]: A list of dictionaries, each containing the title,
+        content, and metadata of the slides in the PDF.
     """
     reader = PdfReader(file_path)
     slides = []
 
     # Extract metadata from the PDF file
-    metadata = reader.metadata or {}  # Fallback to empty dict if not available
+    metadata = reader.metadata or {}
+
+    # Convert metadata to a regular dict (if it isn't already)
+    metadata_dict = {key: metadata[key] for key in metadata}
 
     for page_number, page in enumerate(reader.pages):
         slides.append({
             'title': f'Slide {page_number + 1}',
             'content': page.extract_text() or '',
-            'slide_metadata': metadata
+            'slide_metadata': metadata_dict
         })
 
     return slides
