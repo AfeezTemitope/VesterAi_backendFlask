@@ -3,9 +3,9 @@ import os
 
 class Config:
     # file upload settings
-    UPLOADER_FOLDER = 'storage/uploads'
-    ALLOWED_EXTENSIONS = {'pdf', 'pptx'}
-    MAX_FILE_SIZE = 16 * 1024 * 1024  # 16mb
+    UPLOADER_FOLDER = os.getenv('UPLOAD_FOLDER', 'storage/uploads')
+    ALLOWED_EXTENSIONS = set(os.getenv('ALLOWED_EXTENSIONS', 'pdf,pptx').split(','))
+    MAX_FILE_SIZE = int(os.getenv('MAX_FILE_SIZE', 16 * 1024 * 1024))
 
     # database settings
     SQLALCHEMY_DATABASE_URI = os.getenv('POSTGRES_DB_URI', 'sqlite:///default.db')

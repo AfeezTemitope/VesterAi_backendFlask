@@ -56,15 +56,20 @@ def upload_file():
 
 def get_data():
     """
-    Retrieve all parsed slides from the database and return them as a JSON response.
+    Retrieve the most recent parsed slide data from the database and return it as a JSON response.
     Returns:
-    - jsonify: A list of parsed slide data including the filename, title, content, and metadata.
-      - 200: Successful retrieval of slide data.
+    - 200: JSON data for the most recent slide.
+    - 404: If no slides are found.
     """
-    slides = VesterAi.query.order_by(VesterAi.id.desc()).first()
-    return jsonify([{
-        'filename': slide.filename,
-        'slide_title': slide.slide_title,
-        'slide_content': slide.slide_content,
-        'slide_metadata': slide.metadata
-    } for slide in slides]), 200
+    # Query the most recent slide (highest ID)
+    slide = VesterAi.query.order_by(VesterAi.id.desc()).first()
+
+    if slide:
+        return jsonify({
+            'filename': slide.filename,
+            'slide_title': slide.slide_title,
+            'slide_content': slide.slide_content,
+            'slide_metadata': slide.slide_metadata if isinstance(slide.slide_metadata, dict) else {}
+        }), 200
+    else:
+        return jsonify({'error': 'No slide data found'}), 404
