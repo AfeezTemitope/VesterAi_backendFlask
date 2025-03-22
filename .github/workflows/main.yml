@@ -1,0 +1,46 @@
+name: tbelzbby/vesterai
+
+on:
+  push:
+    branches:
+      - master 
+  pull_request:
+    branches:
+      - master 
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Check out the repository
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # Log in to Docker Hub (or GitHub Container Registry)
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_TOKEN }}
+
+      # Build the Docker image
+      - name: Build Docker image
+        run: docker build -t vesterai .
+
+      # Run tests (optional)
+      - name: Run tests
+        run: |
+          docker run vesterai python -m pytest tests/
+
+      # Tag the Docker image
+      - name: Tag Docker image
+        run: |
+          docker tag vesterai ${{ secrets.DOCKER_HUB_USERNAME }}/vesterai:latest
+          docker tag vesterai ${{ secrets.DOCKER_HUB_USERNAME }}/vesterai:${{ github.sha }}
+
+      # Push the Docker image to Docker Hub
+      - name: Push Docker image
+        run: |
+          docker push ${{ secrets.DOCKER_HUB_USERNAME }}/vesterai:latest
+          docker push ${{ secrets.DOCKER_HUB_USERNAME }}/vesterai:${{ github.sha }}
