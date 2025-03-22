@@ -3,43 +3,56 @@ name: tbelzbby/vesterai
 on:
   push:
     branches:
-      - master 
+      - master
   pull_request:
     branches:
-      - master 
+      - master
 
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
 
     steps:
-      # Check out the repository
+      # Step 1: Check out the repository
       - name: Checkout code
         uses: actions/checkout@v3
 
-      # Log in to Docker Hub (or GitHub Container Registry)
+      # Step 2: Log in to Docker Hub
       - name: Log in to Docker Hub
         uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKER_HUB_USERNAME }}
           password: ${{ secrets.DOCKER_HUB_TOKEN }}
 
-      # Build the Docker image
+      # Step 3: Build the Docker image
       - name: Build Docker image
+        env:
+          POSTGRES_DB_URI: ${{ secrets.POSTGRES_DB_URI }}
+          FLASK_APP: ${{ secrets.FLASK_APP }}
+          FLASK_ENV: ${{ secrets.FLASK_ENV }}
+          UPLOAD_FOLDER: ${{ secrets.UPLOAD_FOLDER }}
+          ALLOWED_EXTENSIONS: ${{ secrets.ALLOWED_EXTENSIONS }}
+          MAX_FILE_SIZE: ${{ secrets.MAX_FILE_SIZE }}
         run: docker build -t vesterai .
 
-      # Run tests (optional)
+      # Step 4: Run tests inside the Docker container
       - name: Run tests
-        run: |
-          docker run vesterai python -m pytest tests/
+        env:
+          POSTGRES_DB_URI: ${{ secrets.POSTGRES_DB_URI }}
+          FLASK_APP: ${{ secrets.FLASK_APP }}
+          FLASK_ENV: ${{ secrets.FLASK_ENV }}
+          UPLOAD_FOLDER: ${{ secrets.UPLOAD_FOLDER }}
+          ALLOWED_EXTENSIONS: ${{ secrets.ALLOWED_EXTENSIONS }}
+          MAX_FILE_SIZE: ${{ secrets.MAX_FILE_SIZE }}
+        run: docker run --env POSTGRES_DB_URI --env FLASK_APP --env FLASK_ENV --env UPLOAD_FOLDER --env ALLOWED_EXTENSIONS --env MAX_FILE_SIZE vesterai python -m pytest tests/
 
-      # Tag the Docker image
+      # Step 5: Tag the Docker image
       - name: Tag Docker image
         run: |
           docker tag vesterai ${{ secrets.DOCKER_HUB_USERNAME }}/vesterai:latest
           docker tag vesterai ${{ secrets.DOCKER_HUB_USERNAME }}/vesterai:${{ github.sha }}
 
-      # Push the Docker image to Docker Hub
+      # Step 6: Push the Docker image to Docker Hub
       - name: Push Docker image
         run: |
           docker push ${{ secrets.DOCKER_HUB_USERNAME }}/vesterai:latest
