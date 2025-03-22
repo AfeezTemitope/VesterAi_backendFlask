@@ -1,10 +1,7 @@
-name: tbelzbby/vesterai
+name: tbelzbby/vester
 
 on:
   push:
-    branches:
-      - master
-  pull_request:
     branches:
       - master
 
@@ -13,25 +10,38 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # Step 1: Checkout the repository
       - name: Checkout code
         uses: actions/checkout@v3
 
-      # Step 2: Install dependencies and freeze requirements
-      - name: Generate requirements.txt
+      - name: Set up python
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.9
+
+      - name: Set up environment variables
+        run: |
+          echo "FLASK_APP=${{ secrets.FLASK_APP }}" >> $GITHUB_ENV
+          echo "POSTGRES_DB_URI=${{ secrets.POSTGRES_DB_URI }}" >> $GITHUB_ENV
+
+      - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip freeze > requirements.txt
 
-      # Step 3: Log in to Docker Hub
+      - name: Run Tests
+        run: |
+          python -m unittest discover tests/
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
       - name: Log in to Docker Hub
         uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKER_HUB_USERNAME }}
           password: ${{ secrets.DOCKER_HUB_TOKEN }}
 
-      # Step 4: Dynamically Create .env file
+      # Create .env file dynamically, if required
       - name: Create .env file dynamically
         run: |
           echo "POSTGRES_DB_URI=${{ secrets.POSTGRES_DB_URI }}" > .env
@@ -41,36 +51,11 @@ jobs:
           echo "ALLOWED_EXTENSIONS=${{ secrets.ALLOWED_EXTENSIONS }}" >> .env
           echo "MAX_FILE_SIZE=${{ secrets.MAX_FILE_SIZE }}" >> .env
 
-      # Step 5: Build Docker Image
       - name: Build Docker image
-        run: docker build -t vesterai .
-
-      # Step 6: Run Tests Inside Docker Container
-      - name: Run tests
-        env:  # Pass environment variables for tests
-          POSTGRES_DB_URI: ${{ secrets.POSTGRES_DB_URI }}
-          FLASK_APP: ${{ secrets.FLASK_APP }}
-          FLASK_ENV: ${{ secrets.FLASK_ENV }}
-          UPLOAD_FOLDER: ${{ secrets.UPLOAD_FOLDER }}
-          ALLOWED_EXTENSIONS: ${{ secrets.ALLOWED_EXTENSIONS }}
-          MAX_FILE_SIZE: ${{ secrets.MAX_FILE_SIZE }}
-        run: docker run \
-          --env POSTGRES_DB_URI \
-          --env FLASK_APP \
-          --env FLASK_ENV \
-          --env UPLOAD_FOLDER \
-          --env ALLOWED_EXTENSIONS \
-          --env MAX_FILE_SIZE \
-          vesterai python -m pytest tests/
-
-      # Step 7: Tag Docker Image
-      - name: Tag Docker image
         run: |
-          docker tag vesterai ${{ secrets.DOCKER_HUB_USERNAME }}/vesterai:latest
-          docker tag vesterai ${{ secrets.DOCKER_HUB_USERNAME }}/vesterai:${{ github.sha }}
+          docker build -t vester:${{ github.sha }} .
 
-      # Step 8: Push Docker Image to Docker Hub
       - name: Push Docker image
         run: |
-          docker push ${{ secrets.DOCKER_HUB_USERNAME }}/vesterai:latest
-          docker push ${{ secrets.DOCKER_HUB_USERNAME }}/vesterai:${{ github.sha }}
+          docker push ${{ secrets.DOCKER_HUB_USERNAME }}/vester:latest
+          docker push ${{ secrets.DOCKER_HUB_USERNAME }}/vester:${{ github.sha }}
