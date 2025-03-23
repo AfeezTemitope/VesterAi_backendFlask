@@ -2,15 +2,14 @@ from flask import request, jsonify
 from werkzeug.utils import secure_filename
 import os
 import logging
-import redis
+from extension import cache
 from config import Config
 from models import db, VesterAi
 from parsers.pdf_parser import parse_pdf
 from parsers.pptx_parser import parse_pptx
+from task import process_file
 
 logging.basicConfig(level=logging.DEBUG)
-
-cache = redis.Redis.from_url(Config.REDIS_URL)
 
 
 def allowed_file(filename):
@@ -58,30 +57,10 @@ def upload_file():
             file_path = os.path.join(Config.UPLOADER_FOLDER, filename)
             file.save(file_path)
 
-            slides = []
-            if filename.endswith('.pdf'):
-                slides = parse_pdf(file_path)
-            elif filename.endswith('.pptx'):
-                slides = parse_pptx(file_path)
-            else:
-                return jsonify({'error': 'Unsupported file format'}), 400
+            # Enqueue the file processing task
+            process_file.delay(file_path, filename)
 
-            db.session.query(VesterAi).delete()
-            db.session.commit()
-
-            for slide in slides:
-                new_slide = VesterAi(
-                    filename=filename,
-                    slide_title=slide['title'],
-                    slide_content=slide['content'],
-                    slide_metadata=slide.get('metadata', {})
-                )
-                db.session.add(new_slide)
-                db.session.commit()
-
-            cache.delete('slides')
-
-            return jsonify({'message': 'File uploaded and processed successfully'}), 200
+            return jsonify({'message': 'Your file is being processed'}), 202
 
         except Exception as e:
             db.session.rollback()
