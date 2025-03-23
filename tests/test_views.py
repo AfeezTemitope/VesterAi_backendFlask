@@ -56,7 +56,6 @@ class TestFlaskApp(unittest.TestCase):
     def test_get_data(self):
         """Test retrieving the most recent parsed slide data."""
         with self.app.app_context():
-            # Add mock slide data to the database
             new_slide = VesterAi(
                 filename='sample.pdf',
                 slide_title='Slide 1',
@@ -66,11 +65,9 @@ class TestFlaskApp(unittest.TestCase):
             db.session.add(new_slide)
             db.session.commit()
 
-            # Call the GET endpoint
             response = self.client.get('/get_data')
             self.assertEqual(response.status_code, 200)
 
-            # Verify the response JSON
             slide = response.get_json()
             self.assertEqual(slide['filename'], 'sample.pdf')
             self.assertEqual(slide['slide_title'], 'Slide 1')

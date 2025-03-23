@@ -14,10 +14,10 @@ def parse_pdf(file_path):
     reader = PdfReader(file_path)
     slides = []
 
-    # Extract metadata from the PDF file
+
     metadata = reader.metadata or {}
 
-    # Convert metadata to a regular dict (if it isn't already)
+
     metadata_dict = {key: metadata[key] for key in metadata}
 
     for page_number, page in enumerate(reader.pages):

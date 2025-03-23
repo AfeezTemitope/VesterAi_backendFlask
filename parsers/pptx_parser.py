@@ -17,7 +17,7 @@ def parse_pptx(file_path):
     for i, slide in enumerate(presentation.slides):
         content = ""
         for shape in slide.shapes:
-            # Check if the shape has text and is not an empty placeholder
+
             if hasattr(shape, "text") and shape.text.strip():
                 content += shape.text.strip() + "\n"
 

@@ -9,6 +9,10 @@ class Config:
 
     # database settings
     SQLALCHEMY_DATABASE_URI = os.getenv('POSTGRES_DB_URI', 'sqlite:///default.db')
+    SQLALCHEMY_ENGINE_OPTIONS = {
+        'pool_timeout': 30,
+        'pool_recycle': 300,
+    }
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
     # Ensuring upload folder exists
