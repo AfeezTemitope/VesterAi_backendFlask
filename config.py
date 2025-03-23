@@ -3,7 +3,7 @@ import os
 
 class Config:
     # file upload settings
-    UPLOADER_FOLDER = os.getenv('UPLOAD_FOLDER', 'storage/uploads')
+    UPLOADER_FOLDER = os.getenv('UPLOAD_FOLDER', '/tmp/uploads' if os.getenv('VERCEL') else 'storage/uploads')
     ALLOWED_EXTENSIONS = set(os.getenv('ALLOWED_EXTENSIONS', 'pdf,pptx').split(','))
     MAX_FILE_SIZE = int(os.getenv('MAX_FILE_SIZE', 16 * 1024 * 1024))
 
