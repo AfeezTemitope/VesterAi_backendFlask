@@ -2,12 +2,15 @@ from flask import request, jsonify
 from werkzeug.utils import secure_filename
 import os
 import logging
+import redis
 from config import Config
 from models import db, VesterAi
 from parsers.pdf_parser import parse_pdf
 from parsers.pptx_parser import parse_pptx
 
 logging.basicConfig(level=logging.DEBUG)
+
+cache = redis.Redis.from_url(Config.REDIS_URL)
 
 
 def allowed_file(filename):
@@ -33,14 +36,14 @@ def upload_file():
         3. Save the file to the upload folder.
         4. Parse the file to extract slide titles, content, and metadata.
         5. Save the extracted data to the database.
-        6. Return a success or error message.
+        6. Clear the Redis cache to ensure fresh data is fetched next time.
+        7. Return a success or error message.
 
     Error Messages:
         - "No file selected": No file was chosen for upload.
         - "Unsupported file format": The file is not a PDF or PowerPoint.
         - "File processing failed": Something went wrong while processing the file.
     """
-
     if 'file' not in request.files:
         return jsonify({'error': 'No file selected'}), 400
 
@@ -63,6 +66,9 @@ def upload_file():
             else:
                 return jsonify({'error': 'Unsupported file format'}), 400
 
+            db.session.query(VesterAi).delete()
+            db.session.commit()
+
             for slide in slides:
                 new_slide = VesterAi(
                     filename=filename,
@@ -73,9 +79,12 @@ def upload_file():
                 db.session.add(new_slide)
                 db.session.commit()
 
+            cache.delete('slides')
+
             return jsonify({'message': 'File uploaded and processed successfully'}), 200
 
         except Exception as e:
+            db.session.rollback()
             logging.error(f"Error processing file: {str(e)}")
             return jsonify({'error': 'File processing failed'}), 500
 
@@ -87,15 +96,21 @@ def get_data():
     Retrieve all parsed slide data from the database and return it as a JSON response.
 
     Steps:
-        1. Query all slides from the database.
-        2. Convert the data to a list of dictionaries.
-        3. Return the data as a JSON response.
+        1. Check if the data is available in the Redis cache.
+        2. If cached data is found, return it.
+        3. If no cached data is found, fetch data from the database.
+        4. Store the fetched data in the Redis cache for future requests.
+        5. Return the data as a JSON response.
 
     Error Messages:
         - "No data found": No files have been uploaded yet.
     """
-    slides = VesterAi.query.all()
 
+    cached_data = cache.get('slides')
+    if cached_data:
+        return jsonify(cached_data), 200
+
+    slides = VesterAi.query.all()
     if slides:
         slides_data = [{
             'filename': slide.filename,
@@ -103,6 +118,8 @@ def get_data():
             'slide_content': slide.slide_content,
             'slide_metadata': slide.slide_metadata if isinstance(slide.slide_metadata, dict) else {}
         } for slide in slides]
+
+        cache.set('slides', jsonify(slides_data).get_data(as_text=True), ex=3600)
         return jsonify(slides_data), 200
 
     return jsonify({'error': 'No data found'}), 404

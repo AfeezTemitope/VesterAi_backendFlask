@@ -22,11 +22,13 @@ jobs:
         run: |
           echo "FLASK_APP=${{ secrets.FLASK_APP }}" >> $GITHUB_ENV
           echo "POSTGRES_DB_URI=${{ secrets.POSTGRES_DB_URI }}" >> $GITHUB_ENV
+          echo "REDIS_URL=${{ secrets.REDIS_URL }}" >> $GITHUB_ENV
 
       - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+          pip install redis
 
       - name: Run Tests
         run: |
@@ -50,6 +52,7 @@ jobs:
           echo "UPLOAD_FOLDER=${{ secrets.UPLOAD_FOLDER }}" >> .env
           echo "ALLOWED_EXTENSIONS=${{ secrets.ALLOWED_EXTENSIONS }}" >> .env
           echo "MAX_FILE_SIZE=${{ secrets.MAX_FILE_SIZE }}" >> .env
+          echo "REDIS_URL=${{ secrets.REDIS_URL }}" >> .env
 
       - name: Build Docker image
         run: |

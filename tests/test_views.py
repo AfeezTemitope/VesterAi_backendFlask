@@ -1,4 +1,5 @@
 import unittest
+from unittest.mock import patch, MagicMock
 from flask import Flask
 from werkzeug.datastructures import FileStorage
 from models import db, VesterAi
@@ -29,7 +30,8 @@ class TestFlaskApp(unittest.TestCase):
         with self.app.app_context():
             db.drop_all()
 
-    def test_upload_file_valid_pdf(self):
+    @patch('views.cache')
+    def test_upload_file_valid_pdf(self, mock_cache):
         """Test uploading a valid PDF file."""
         sample_pdf_path = 'tests/sample.pdf'
         create_sample_pdf(sample_pdf_path)
@@ -53,15 +55,19 @@ class TestFlaskApp(unittest.TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertIn('Unsupported file format', response.get_json()['error'])
 
-    def test_get_data(self):
+    @patch('views.cache')  # Mock the Redis cache
+    def test_get_data(self, mock_cache):
         """Test retrieving the most recent parsed slide data."""
+        # Mock Redis cache to return None (cache miss)
+        mock_cache.get.return_value = None
+
         with self.app.app_context():
             # Add a sample slide to the database
             new_slide = VesterAi(
                 filename='sample.pdf',
                 slide_title='Slide 1',
                 slide_content='Sample PDF content for test',
-                slide_metadata={'key': 'value'}  # Example metadata
+                slide_metadata={'key': 'value'}
             )
             db.session.add(new_slide)
             db.session.commit()
@@ -79,8 +85,12 @@ class TestFlaskApp(unittest.TestCase):
                 self.assertEqual(slide['slide_content'], 'Sample PDF content for test')
                 self.assertEqual(slide['slide_metadata'], {'key': 'value'})
 
-    def test_get_data_empty_db(self):
+    @patch('views.cache')  # Mock the Redis cache
+    def test_get_data_empty_db(self, mock_cache):
         """Test retrieving slide data when the database is empty."""
+        # Mock Redis cache to return None (cache miss)
+        mock_cache.get.return_value = None
+
         response = self.client.get('/get_data')
         self.assertEqual(response.status_code, 404)
         self.assertIn('No data found', response.get_json()['error'])

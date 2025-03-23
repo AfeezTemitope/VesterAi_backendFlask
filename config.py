@@ -15,6 +15,9 @@ class Config:
     }
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
+    # redis connection
+    REDIS_URL = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
+
     # Ensuring upload folder exists
     if not os.path.exists(UPLOADER_FOLDER):
         os.makedirs(UPLOADER_FOLDER)

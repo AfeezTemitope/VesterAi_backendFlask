@@ -14,9 +14,7 @@ def parse_pdf(file_path):
     reader = PdfReader(file_path)
     slides = []
 
-
     metadata = reader.metadata or {}
-
 
     metadata_dict = {key: metadata[key] for key in metadata}
 
