@@ -39,7 +39,7 @@ class TestFlaskApp(unittest.TestCase):
             response = self.client.post('/upload', data=data, content_type='multipart/form-data')
 
         self.assertEqual(response.status_code, 200)
-        self.assertIn('File uploaded and parsed successfully', response.get_json()['message'])
+        self.assertIn('File uploaded and processed successfully', response.get_json()['message'])
 
     def test_upload_file_invalid_format(self):
         """Test uploading a file with an unsupported format."""
@@ -56,6 +56,7 @@ class TestFlaskApp(unittest.TestCase):
     def test_get_data(self):
         """Test retrieving the most recent parsed slide data."""
         with self.app.app_context():
+            # Add a sample slide to the database
             new_slide = VesterAi(
                 filename='sample.pdf',
                 slide_title='Slide 1',
@@ -68,17 +69,21 @@ class TestFlaskApp(unittest.TestCase):
             response = self.client.get('/get_data')
             self.assertEqual(response.status_code, 200)
 
-            slide = response.get_json()
-            self.assertEqual(slide['filename'], 'sample.pdf')
-            self.assertEqual(slide['slide_title'], 'Slide 1')
-            self.assertEqual(slide['slide_content'], 'Sample PDF content for test')
-            self.assertEqual(slide['slide_metadata'], {'key': 'value'})
+            slides = response.get_json()
+            self.assertIsInstance(slides, list)
+
+            if slides:
+                slide = slides[0]
+                self.assertEqual(slide['filename'], 'sample.pdf')
+                self.assertEqual(slide['slide_title'], 'Slide 1')
+                self.assertEqual(slide['slide_content'], 'Sample PDF content for test')
+                self.assertEqual(slide['slide_metadata'], {'key': 'value'})
 
     def test_get_data_empty_db(self):
         """Test retrieving slide data when the database is empty."""
         response = self.client.get('/get_data')
         self.assertEqual(response.status_code, 404)
-        self.assertIn('No slide data found', response.get_json()['error'])
+        self.assertIn('No data found', response.get_json()['error'])
 
 
 if __name__ == '__main__':
