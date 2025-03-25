@@ -1,15 +1,16 @@
+import json
 from flask import request, jsonify
 from werkzeug.utils import secure_filename
 import os
 import logging
-from extension import cache
 from config import Config
 from models import db, VesterAi
-from parsers.pdf_parser import parse_pdf
-from parsers.pptx_parser import parse_pptx
 from task import process_file
+from extension import redis_client
 
-logging.basicConfig(level=logging.DEBUG)
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 def allowed_file(filename):
@@ -27,28 +28,29 @@ def allowed_file(filename):
 
 def upload_file():
     """
-    Handle file uploads, process the file, and save the extracted data to the database.
+    Handle file uploads and enqueue processing in the background.
 
     Steps:
-        1. Check if a file is included in the request.
-        2. Validate the file name and extension.
+        1. Validate the presence and name of the file in the request.
+        2. Check if the file extension is allowed.
         3. Save the file to the upload folder.
-        4. Parse the file to extract slide titles, content, and metadata.
-        5. Save the extracted data to the database.
-        6. Clear the Redis cache to ensure fresh data is fetched next time.
-        7. Return a success or error message.
+        4. Enqueue a Celery task to process the file.
+        5. Return a response indicating processing has started.
 
-    Error Messages:
-        - "No file selected": No file was chosen for upload.
-        - "Unsupported file format": The file is not a PDF or PowerPoint.
-        - "File processing failed": Something went wrong while processing the file.
+    Returns:
+        JSON response with a message and HTTP status:
+        - 202: File accepted for processing.
+        - 400: Invalid file or no file selected.
+        - 500: Error saving the file.
     """
     if 'file' not in request.files:
+        logger.warning("No file selected in request")
         return jsonify({'error': 'No file selected'}), 400
 
     file = request.files['file']
 
     if file.filename == '':
+        logger.warning("Empty filename in request")
         return jsonify({'error': 'No file selected'}), 400
 
     if file and allowed_file(file.filename):
@@ -56,38 +58,46 @@ def upload_file():
             filename = secure_filename(file.filename)
             file_path = os.path.join(Config.UPLOADER_FOLDER, filename)
             file.save(file_path)
+            logger.info(f"Saved file {filename} to {file_path}")
 
             # Enqueue the file processing task
             process_file.delay(file_path, filename)
+            logger.info(f"Enqueued processing for {filename}")
 
             return jsonify({'message': 'Your file is being processed'}), 202
-
         except Exception as e:
-            db.session.rollback()
-            logging.error(f"Error processing file: {str(e)}")
+            logger.error(f"Error saving file {filename}: {e}")
             return jsonify({'error': 'File processing failed'}), 500
 
+    logger.warning(f"Unsupported file format: {file.filename}")
     return jsonify({'error': 'Unsupported file format'}), 400
 
 
 def get_data():
     """
-    Retrieve all parsed slide data from the database and return it as a JSON response.
+    Retrieve all parsed slide data, with fallback to process if not found.
 
     Steps:
-        1. Check if the data is available in the Redis cache.
-        2. If cached data is found, return it.
-        3. If no cached data is found, fetch data from the database.
-        4. Store the fetched data in the Redis cache for future requests.
-        5. Return the data as a JSON response.
+        1. Check Redis cache for slide data.
+        2. If cached, return it.
+        3. If not cached, fetch from the database.
+        4. If no data in database, attempt to process a default file (if configured).
+        5. Cache the result in Redis with a 1-hour expiration.
+        6. Return the data as JSON.
 
-    Error Messages:
-        - "No data found": No files have been uploaded yet.
+    Returns:
+        JSON response with slide data (200) or error message (404).
     """
 
-    cached_data = cache.get('slides')
-    if cached_data:
-        return jsonify(cached_data), 200
+    SLIDES_CACHE_KEY = 'slides'
+
+    try:
+        cached_data = redis_client.get(SLIDES_CACHE_KEY)
+        if cached_data:
+            logger.info("Returning cached slide data")
+            return jsonify(json.loads(cached_data)), 200
+    except Exception as e:
+        logger.error(f"Failed to fetch from Redis: {e}")
 
     slides = VesterAi.query.all()
     if slides:
@@ -98,7 +108,25 @@ def get_data():
             'slide_metadata': slide.slide_metadata if isinstance(slide.slide_metadata, dict) else {}
         } for slide in slides]
 
-        cache.set('slides', jsonify(slides_data).get_data(as_text=True), ex=3600)
-        return jsonify(slides_data), 200
+        try:
+            redis_client.setex(SLIDES_CACHE_KEY, 3600, json.dumps(slides_data))
+            logger.info("Cached slide data in Redis with 1-hour expiration")
+        except Exception as e:
+            logger.error(f"Failed to cache in Redis: {e}")
 
-    return jsonify({'error': 'No data found'}), 404
+        return jsonify(slides_data), 200
+    else:
+        # Fallback: Attempt to process a default file if configured
+        default_file = os.environ.get('DEFAULT_FILE_PATH')  # Set this in Vercel env if needed
+        if default_file and os.path.exists(default_file):
+            filename = os.path.basename(default_file)
+            if allowed_file(filename):
+                try:
+                    process_file.delay(default_file, filename)
+                    logger.info(f"Enqueued default file {filename} for processing")
+                    return jsonify({'message': 'No data found, processing default file'}), 202
+                except Exception as e:
+                    logger.error(f"Error enqueuing default file {filename}: {e}")
+
+        logger.warning("No slide data found in database or default file")
+        return jsonify({'error': 'No data found'}), 404

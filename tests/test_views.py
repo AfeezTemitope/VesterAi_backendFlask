@@ -31,8 +31,8 @@ class TestFlaskApp(unittest.TestCase):
             db.drop_all()
 
     @patch('views.process_file.delay')  # Mock the Celery task
-    @patch('views.cache')  # Mock the Redis cache
-    def test_upload_file_valid_pdf(self, mock_cache, mock_process_file):
+    @patch('views.redis_client')  # Mock the Redis client (corrected from 'views.cache')
+    def test_upload_file_valid_pdf(self, mock_redis_client, mock_process_file):
         """
         Test uploading a valid PDF file.
         Ensures that the file is accepted and the Celery task is enqueued.
@@ -71,14 +71,14 @@ class TestFlaskApp(unittest.TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertIn('Unsupported file format', response.get_json()['error'])
 
-    @patch('views.cache')  # Mock the Redis cache
-    def test_get_data(self, mock_cache):
+    @patch('views.redis_client')  # Mock the Redis client (corrected from 'views.cache')
+    def test_get_data(self, mock_redis_client):
         """
         Test retrieving the most recent parsed slide data.
         Ensures that the data is returned correctly.
         """
-        # Mock Redis cache to return None (cache miss)
-        mock_cache.get.return_value = None
+        # Mock Redis client to return None (cache miss)
+        mock_redis_client.get.return_value = None
 
         with self.app.app_context():
             # Add a sample slide to the database
@@ -106,14 +106,14 @@ class TestFlaskApp(unittest.TestCase):
                 self.assertEqual(slide['slide_content'], 'Sample PDF content for test')
                 self.assertEqual(slide['slide_metadata'], {'key': 'value'})
 
-    @patch('views.cache')  # Mock the Redis cache
-    def test_get_data_empty_db(self, mock_cache):
+    @patch('views.redis_client')  # Mock the Redis client (corrected from 'views.cache')
+    def test_get_data_empty_db(self, mock_redis_client):
         """
         Test retrieving slide data when the database is empty.
         Ensures that the correct error message is returned.
         """
-        # Mock Redis cache to return None (cache miss)
-        mock_cache.get.return_value = None
+        # Mock Redis client to return None (cache miss)
+        mock_redis_client.get.return_value = None
 
         # Simulate a request to retrieve data
         response = self.client.get('/get_data')
